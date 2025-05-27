@@ -75,11 +75,13 @@ jobs:
 
         rmdir "dist/$SOURCE_UNPACKED_DIR"
 
+        # Create the launcher script
         echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/Makocera.sh"
         echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
         echo '"$DIR/Makocera/makocera" --no-sandbox' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
         chmod +x "$PACKAGE_STAGE_DIR/Makocera.sh"
 
+        # Example pad config
         cat << EOF > "$PACKAGE_STAGE_DIR/Makocera.sh.keys"
         {
             "actions_player1": [
@@ -120,25 +122,24 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
 
-    - name: Create final tar.gz bundle
-      id: create_tarball
+    # Create a tar.gz containing Makocera.sh, Makocera.sh.keys, and the source folder
+    - name: Create release tar.gz with shell, pad, and source files
+      id: create_release_tar
       run: |
-        VERSION="${{ steps.prepare_package.outputs.version }}"
-        TARGET_DIR_TO_TAR="${{ steps.prepare_package.outputs.target_package_dir_name }}"
-        cd dist
-        TAR_NAME="makocera-${VERSION}-${{ matrix.arch }}.tar.gz"
-        tar -czf "$TAR_NAME" "$TARGET_DIR_TO_TAR"
-        echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
-        echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
+        cd dist/${{ steps.prepare_package.outputs.target_package_dir_name }}
+        tar -czf ../makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz Makocera.sh Makocera.sh.keys Makocera/
+        echo "release_tar_path=$PWD/../makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz" >> $GITHUB_OUTPUT
 
     - name: Create Batocera Pacman Package
       id: create_pacman_pkg
       run: |
         VERSION="${{ steps.prepare_package.outputs.version }}"
         PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
-        tar --zstd -cf "makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst" -C batocera-pkg .
+        PKG_FILE="makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst"
+        tar --zstd -cf "$PKG_FILE" -C batocera-pkg .
         mkdir -p pacman-repo
-        cp "makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst" pacman-repo/
+        cp "$PKG_FILE" pacman-repo/
+        echo "pkg_file=$PWD/$PKG_FILE" >> $GITHUB_OUTPUT
 
     - name: Create pacman repo metadata (repo-add in Arch container)
       run: |
@@ -157,22 +158,20 @@ jobs:
       with:
         name: ${{ steps.artifact_name.outputs.name }}
         path: |
-          ${{ steps.create_tarball.outputs.tarball_path }}
-          makocera-*.pkg.tar.zst
+          dist/makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz
+          ${{ steps.create_pacman_pkg.outputs.pkg_file }}
           pacman-repo/*
         retention-days: 5
 
-    # --- Removed gavv/pull-request-artifacts@v2 step (not suitable for large files or binaries) ---
-
     - name: Create GitHub Release and Upload Bundled Asset
-      id: create_release
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
         files: |
-          ${{ steps.create_tarball.outputs.tarball_path }}
-          makocera-*.pkg.tar.zst
+          dist/makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz
+          ${{ steps.create_pacman_pkg.outputs.pkg_file }}
+          pacman-repo/*
         append_body: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
