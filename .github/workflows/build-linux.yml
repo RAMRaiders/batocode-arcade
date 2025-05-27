@@ -162,15 +162,7 @@ jobs:
           pacman-repo/*
         retention-days: 5
 
-    - name: Comment on PR with artifact links
-      if: github.event_name == 'pull_request'
-      uses: gavv/pull-request-artifacts@v2
-      with:
-        commit: ${{ github.event.pull_request.head.sha }}
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: ${{ steps.create_tarball.outputs.tarball_path }}
-        comment-title: "📦 Makocera Build Artifacts"
-        comment-message: "Here are the latest build artifacts for this Pull Request:"
+    # --- Removed gavv/pull-request-artifacts@v2 step (not suitable for large files or binaries) ---
 
     - name: Create GitHub Release and Upload Bundled Asset
       id: create_release
