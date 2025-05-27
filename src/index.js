@@ -17,7 +17,9 @@ function createWindow() {
     console.error('Failed to load URL:', errorDescription, errorCode);
   });
 
-  win.loadURL('https://arcade.makecode.com/--kiosk');
+  win.loadURL('https://arcade.makecode.com/--kiosk').catch(err => {
+    console.error('Error loading URL:', err);
+  });
 
   win.webContents.on('did-finish-load', () => {
     win.show();
@@ -42,10 +44,14 @@ app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });

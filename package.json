@@ -1,8 +1,8 @@
 {
-  "name": "makocera",
-  "description": "A simple wrapper that can run Makecode Arcade games Kiosk mode in Batocera",
+  "name": "batocode-arcade",
+  "description": "A Chromium-based Electron app that runs MakeCode Arcade games in Kiosk mode on Batocera.",
   "author": "RAM Raiders",
-  "version": "1.4.7",
+  "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
     "start": "electron .",
@@ -11,23 +11,26 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git@github.com:RAMRaiders/makocera.git"
+    "url": "https://github.com/RAMRaiders/batocode-arcade.git"
   },
   "engines": {
-    "node": "22.15.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "electron": "^28.1.0",
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "com.ramraiders.makocera",
-    "productName": "MakOcera",
+    "appId": "com.ramraiders.batocode-arcade",
+    "productName": "BatoCode Arcade",
+    "asar": true,
     "files": [
       "src/**/*",
       "package.json",
       "!node_modules/**/*"
     ],
+    "extraResource": [],
+    "extraFiles": [],
     "mac": {
       "target": "dmg",
       "icon": "assets/icon.png"

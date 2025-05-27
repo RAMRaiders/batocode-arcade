@@ -12,14 +12,11 @@ on:
 jobs:
   build-linux:
     permissions:
-      contents: write 
-
+      contents: write
     runs-on: ubuntu-24.04
-
     strategy:
       matrix:
         arch: [x64, arm64]
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -33,14 +30,19 @@ jobs:
       with:
         node-version: 22
 
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
     - name: Install Node.js dependencies
       run: npm ci
 
     - name: Install Electron system dependencies
       run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64
-
-    - name: Ensure dist folder exists
-      run: mkdir -p dist
 
     - name: Build Linux ${{ matrix.arch }} package (unpacked)
       run: npx electron-builder --linux --${{ matrix.arch }} --dir
@@ -48,35 +50,38 @@ jobs:
     - name: Prepare package directory and launcher script
       id: prepare_package
       run: |
+        set -e
         if [[ "${{ github.ref_type }}" == "tag" ]]; then
           VERSION=${GITHUB_REF_NAME#v}
         else
-          VERSION="PR-${GITHUB_SHA::7}"
+          VERSION="pr-${GITHUB_SHA::7}"
         fi
 
         if [[ "${{ matrix.arch }}" == "x64" ]]; then
           SOURCE_UNPACKED_DIR="linux-unpacked"
+          PKG_ARCH="x86_64"
         else
           SOURCE_UNPACKED_DIR="linux-${{ matrix.arch }}-unpacked"
+          PKG_ARCH="aarch64"
         fi
 
-        TARGET_PACKAGE_DIR_NAME="Makocera-linux-${{ matrix.arch }}-$VERSION"
+        TARGET_PACKAGE_DIR_NAME="batocode-arcade-linux-${{ matrix.arch }}-$VERSION"
         PACKAGE_STAGE_DIR="dist/$TARGET_PACKAGE_DIR_NAME"
 
-        mkdir -p "$PACKAGE_STAGE_DIR/Makocera"
+        mkdir -p "$PACKAGE_STAGE_DIR/batocode-arcade"
 
         shopt -s dotglob
-        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/Makocera/"
+        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/batocode-arcade/"
         shopt -u dotglob
 
         rmdir "dist/$SOURCE_UNPACKED_DIR"
 
-        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/Makocera.sh"
-        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
-        echo '"$DIR/Makocera/makocera" --no-sandbox' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
-        chmod +x "$PACKAGE_STAGE_DIR/Makocera.sh"
+        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
+        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
+        echo '"$DIR/batocode-arcade/batocode-arcade" --no-sandbox' >> "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
+        chmod +x "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
 
-        cat << EOF > "$PACKAGE_STAGE_DIR/Makocera.sh.keys"
+        cat << EOF > "$PACKAGE_STAGE_DIR/batocode-arcade.sh.keys"
         {
             "actions_player1": [
                 {
@@ -93,30 +98,62 @@ jobs:
             ]
         }
         EOF
+
+        # Prepare PKGINFO for Batocera pacman package
+        mkdir -p batocera-pkg
+        cat <<EOF > batocera-pkg/.PKGINFO
+        pkgname = batocode-arcade
+        pkgver = ${VERSION}
+        pkgdesc = Batocode Arcade build for Batocera
+        arch = ${PKG_ARCH}
+        group = ports
+        packager = github-actions
+        url = https://github.com/${GITHUB_REPOSITORY}
+        EOF
+
+        # Copy built files into Batocera package structure
+        mkdir -p batocera-pkg/userdata/system/ports/batocode-arcade
+        cp -r "$PACKAGE_STAGE_DIR/"* batocera-pkg/userdata/system/ports/batocode-arcade/
+
         echo "target_package_dir_name=$TARGET_PACKAGE_DIR_NAME" >> $GITHUB_OUTPUT
+        echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
+        echo "pkg_version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Create final tar.gz bundle
       id: create_tarball
       run: |
+        set -e
         if [[ "${{ github.ref_type }}" == "tag" ]]; then
           VERSION=${GITHUB_REF_NAME#v}
         else
-          VERSION="PR-${GITHUB_SHA::7}"
+          VERSION="pr-${GITHUB_SHA::7}"
         fi
 
         TARGET_DIR_TO_TAR="${{ steps.prepare_package.outputs.target_package_dir_name }}"
 
         cd dist
-        TAR_NAME="makocera-${VERSION}-${{ matrix.arch }}.tar.gz"
+        TAR_NAME="batocode-arcade-${VERSION}-${{ matrix.arch }}.tar.gz"
         tar -czf "$TAR_NAME" "$TARGET_DIR_TO_TAR"
         echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
-        echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT # <-- NEW: Output just the filename
+        echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
+
+    - name: Build Batocera Pacman package
+      id: create_pacman_pkg
+      run: |
+        set -e
+        PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
+        VERSION="${{ steps.prepare_package.outputs.pkg_version }}"
+        cd batocera-pkg
+        tar --zstd -cf ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst .
+        echo "pacman_pkg_path=$(realpath ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst)" >> $GITHUB_OUTPUT
 
     - name: Upload Build Artifact (for GitHub Actions UI)
       uses: actions/upload-artifact@v4
       with:
-        name: makocera-linux-${{ matrix.arch }}-${{ github.ref_name || github.event.pull_request.head.sha }}
-        path: ${{ steps.create_tarball.outputs.tarball_path }}
+        name: batocode-arcade-linux-${{ matrix.arch }}-${{ github.ref_name || github.event.pull_request.head.sha }}
+        path: |
+          ${{ steps.create_tarball.outputs.tarball_path }}
+          ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
         retention-days: 5
 
     - name: Comment on PR with artifact links
@@ -125,9 +162,11 @@ jobs:
       with:
         commit: ${{ github.event.pull_request.head.sha }}
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: ${{ steps.create_tarball.outputs.tarball_path }}
-        comment-title: "📦 Makocera Build Artifacts"
-        comment-message: "Here are the latest build artifacts for this Pull Request:"
+        artifacts: |
+          ${{ steps.create_tarball.outputs.tarball_path }}
+          ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
+        comment-title: "📦 batocode-arcade build artifacts"
+        comment-message: "Here are the latest build artifacts for this pull request:"
 
     - name: Create GitHub Release and Upload Bundled Asset
       id: create_release
@@ -135,6 +174,8 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
-        files: ${{ steps.create_tarball.outputs.tarball_path }}
+        files: |
+          ${{ steps.create_tarball.outputs.tarball_path }}
+          ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
