@@ -13,8 +13,6 @@ jobs:
   build-linux:
     permissions:
       contents: write
-      pages: write
-      id-token: write
     runs-on: ubuntu-24.04
 
     strategy:
@@ -77,6 +75,7 @@ jobs:
         shopt -s dotglob
         mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/batocode-arcade/"
         shopt -u dotglob
+
         rmdir "dist/$SOURCE_UNPACKED_DIR"
 
         echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
@@ -102,6 +101,7 @@ jobs:
         }
         EOF
 
+        # Prepare PKGINFO for Batocera pacman package
         mkdir -p batocera-pkg
         cat <<EOF > batocera-pkg/.PKGINFO
         pkgname = batocode-arcade
@@ -113,6 +113,7 @@ jobs:
         url = https://github.com/${GITHUB_REPOSITORY}
         EOF
 
+        # Copy built files into Batocera package structure
         mkdir -p batocera-pkg/userdata/system/ports/batocode-arcade
         cp -r "$PACKAGE_STAGE_DIR/"* batocera-pkg/userdata/system/ports/batocode-arcade/
 
@@ -130,9 +131,11 @@ jobs:
           VERSION="pr-${GITHUB_SHA::7}"
         fi
 
+        TARGET_DIR_TO_TAR="${{ steps.prepare_package.outputs.target_package_dir_name }}"
+
         cd dist
         TAR_NAME="batocode-arcade-${VERSION}-${{ matrix.arch }}.tar.gz"
-        tar -czf "$TAR_NAME" "${{ steps.prepare_package.outputs.target_package_dir_name }}"
+        tar -czf "$TAR_NAME" "$TARGET_DIR_TO_TAR"
         echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
         echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
 
@@ -144,6 +147,10 @@ jobs:
         VERSION="${{ steps.prepare_package.outputs.pkg_version }}"
         cd batocera-pkg
         tar --zstd -cf ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst .
+        echo "pacman_pkg_path=$(realpath ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst)" >> $GITHUB_OUTPUT
+
+    - name: Install pacman tools
+      run: sudo apt-get update && sudo apt-get install -y pacman
 
     - name: Create Pacman Repo Metadata
       id: pacman_repo
@@ -156,31 +163,36 @@ jobs:
         cd pacman-repo
         repo-add batocode-arcade.db.tar.gz batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst
 
-    - name: Deploy Pacman Repo to GitHub Pages
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_branch: gh-pages
-        publish_dir: ./pacman-repo
-        destination_dir: repo
-        force_orphan: true
+    - name: Sanitize artifact name
+      id: sanitize_name
+      run: |
+        if [[ -n "${GITHUB_REF_NAME}" ]]; then
+          SAFE_REF_NAME="${GITHUB_REF_NAME//\//-}"
+          echo "ARTIFACT_REF_NAME=$SAFE_REF_NAME" >> $GITHUB_ENV
+        else
+          SAFE_SHA="${GITHUB_SHA//\//-}"
+          echo "ARTIFACT_REF_NAME=$SAFE_SHA" >> $GITHUB_ENV
+        fi
 
-    - name: Upload Build Artifacts
+    - name: Upload Build Artifact (for GitHub Actions UI)
       uses: actions/upload-artifact@v4
       with:
-        name: batocode-arcade-linux-${{ matrix.arch }}
+        name: batocode-arcade-linux-${{ matrix.arch }}-${{ env.ARTIFACT_REF_NAME }}
         path: |
           ${{ steps.create_tarball.outputs.tarball_path }}
-          batocode-arcade-${{ steps.prepare_package.outputs.pkg_version }}-${{ steps.prepare_package.outputs.pkg_arch }}.pkg.tar.zst
+          ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
+          pacman-repo
+        retention-days: 7
 
-    - name: Create GitHub Release and Upload Artifacts
+    - name: Create GitHub Release and Upload Bundled Asset
+      id: create_release
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
         files: |
           ${{ steps.create_tarball.outputs.tarball_path }}
-          batocode-arcade-${{ steps.prepare_package.outputs.pkg_version }}-${{ steps.prepare_package.outputs.pkg_arch }}.pkg.tar.zst
+          ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
+          pacman-repo/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
