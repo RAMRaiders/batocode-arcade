@@ -1,0 +1,43 @@
+{
+  "name": "makocera",
+  "description": "A simple wrapper that can run Makecode Arcade games Kiosk mode in Batocera",
+  "author": "RAM Raiders",
+  "version": "1.4.7",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:RAMRaiders/makocera.git"
+  },
+  "engines": {
+    "node": "22.15.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.ramraiders.makocera",
+    "productName": "MakOcera",
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": [
+        "tar.gz"
+      ],
+      "category": "Game",
+      "icon": "assets/icon.png"
+    }
+  }
+}

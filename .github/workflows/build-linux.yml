@@ -1,0 +1,140 @@
+name: Build Linux Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-linux:
+    permissions:
+      contents: write 
+
+    runs-on: ubuntu-24.04
+
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up QEMU (for ARM emulation)
+      if: matrix.arch == 'arm64'
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 22
+
+    - name: Install Node.js dependencies
+      run: npm ci
+
+    - name: Install Electron system dependencies
+      run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64
+
+    - name: Ensure dist folder exists
+      run: mkdir -p dist
+
+    - name: Build Linux ${{ matrix.arch }} package (unpacked)
+      run: npx electron-builder --linux --${{ matrix.arch }} --dir
+
+    - name: Prepare package directory and launcher script
+      id: prepare_package
+      run: |
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          VERSION=${GITHUB_REF_NAME#v}
+        else
+          VERSION="PR-${GITHUB_SHA::7}"
+        fi
+
+        if [[ "${{ matrix.arch }}" == "x64" ]]; then
+          SOURCE_UNPACKED_DIR="linux-unpacked"
+        else
+          SOURCE_UNPACKED_DIR="linux-${{ matrix.arch }}-unpacked"
+        fi
+
+        TARGET_PACKAGE_DIR_NAME="Makocera-linux-${{ matrix.arch }}-$VERSION"
+        PACKAGE_STAGE_DIR="dist/$TARGET_PACKAGE_DIR_NAME"
+
+        mkdir -p "$PACKAGE_STAGE_DIR/Makocera"
+
+        shopt -s dotglob
+        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/Makocera/"
+        shopt -u dotglob
+
+        rmdir "dist/$SOURCE_UNPACKED_DIR"
+
+        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/Makocera.sh"
+        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
+        echo '"$DIR/Makocera/makocera" --no-sandbox' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
+        chmod +x "$PACKAGE_STAGE_DIR/Makocera.sh"
+
+        cat << EOF > "$PACKAGE_STAGE_DIR/Makocera.sh.keys"
+        {
+            "actions_player1": [
+                {
+                    "trigger": [
+                        "hotkey",
+                        "start"
+                    ],
+                    "type": "key",
+                    "target": [
+                        "KEY_LEFTALT",
+                        "KEY_F4"
+                    ]
+                }
+            ]
+        }
+        EOF
+        echo "target_package_dir_name=$TARGET_PACKAGE_DIR_NAME" >> $GITHUB_OUTPUT
+
+    - name: Create final tar.gz bundle
+      id: create_tarball
+      run: |
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          VERSION=${GITHUB_REF_NAME#v}
+        else
+          VERSION="PR-${GITHUB_SHA::7}"
+        fi
+
+        TARGET_DIR_TO_TAR="${{ steps.prepare_package.outputs.target_package_dir_name }}"
+
+        cd dist
+        TAR_NAME="makocera-${VERSION}-${{ matrix.arch }}.tar.gz"
+        tar -czf "$TAR_NAME" "$TARGET_DIR_TO_TAR"
+        echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
+        echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT # <-- NEW: Output just the filename
+
+    - name: Upload Build Artifact (for GitHub Actions UI)
+      uses: actions/upload-artifact@v4
+      with:
+        name: makocera-linux-${{ matrix.arch }}-${{ github.ref_name || github.event.pull_request.head.sha }}
+        path: ${{ steps.create_tarball.outputs.tarball_path }}
+        retention-days: 5
+
+    - name: Comment on PR with artifact links
+      if: github.event_name == 'pull_request'
+      uses: gavv/pull-request-artifacts@v2
+      with:
+        commit: ${{ github.event.pull_request.head.sha }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        artifacts: ${{ steps.create_tarball.outputs.tarball_path }}
+        comment-title: "📦 Makocera Build Artifacts"
+        comment-message: "Here are the latest build artifacts for this Pull Request:"
+
+    - name: Create GitHub Release and Upload Bundled Asset
+      id: create_release
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        files: ${{ steps.create_tarball.outputs.tarball_path }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
