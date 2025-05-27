@@ -47,7 +47,7 @@ jobs:
     - name: Build Linux ${{ matrix.arch }} package (unpacked)
       run: npx electron-builder --linux --${{ matrix.arch }} --dir
 
-    - name: Prepare package directory and launcher script
+    - name: Prepare package directory, media, and launcher script
       id: prepare_package
       run: |
         if [[ "${{ github.ref_type }}" == "tag" ]]; then
@@ -64,25 +64,25 @@ jobs:
           PKG_ARCH="aarch64"
         fi
 
-        TARGET_PACKAGE_DIR_NAME="Makocera-linux-${{ matrix.arch }}-$VERSION"
+        TARGET_PACKAGE_DIR_NAME="batocode-arcade-linux-${{ matrix.arch }}-$VERSION"
         PACKAGE_STAGE_DIR="dist/$TARGET_PACKAGE_DIR_NAME"
 
-        mkdir -p "$PACKAGE_STAGE_DIR/Makocera"
+        mkdir -p "$PACKAGE_STAGE_DIR/batocode-arcade"
 
         shopt -s dotglob
-        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/Makocera/"
+        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/batocode-arcade/"
         shopt -u dotglob
 
         rmdir "dist/$SOURCE_UNPACKED_DIR"
 
         # Create the launcher script
-        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/Makocera.sh"
-        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
-        echo '"$DIR/Makocera/makocera" --no-sandbox' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
-        chmod +x "$PACKAGE_STAGE_DIR/Makocera.sh"
+        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
+        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
+        echo '"$DIR/batocode-arcade/batocode-arcade" --no-sandbox' >> "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
+        chmod +x "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
 
-        # Example pad config
-        cat << EOF > "$PACKAGE_STAGE_DIR/Makocera.sh.keys"
+        # Pad config
+        cat << EOF > "$PACKAGE_STAGE_DIR/batocode-arcade.sh.keys"
         {
             "actions_player1": [
                 {
@@ -100,42 +100,69 @@ jobs:
         }
         EOF
 
-        # Batocera package structure
-        mkdir -p batocera-pkg/userdata/roms/ports
-        cp -r "$PACKAGE_STAGE_DIR/Makocera.sh" batocera-pkg/userdata/roms/ports/
-        cp -r "$PACKAGE_STAGE_DIR/Makocera.sh.keys" batocera-pkg/userdata/roms/ports/
-        cp -r "$PACKAGE_STAGE_DIR/Makocera/" batocera-pkg/userdata/roms/ports/
-        # Optionally: cp gamelist.xml, images, etc.
+        # Prepare Batocera package structure
+        PKG_ROOT="batocera-pkg"
+        PORTS_DIR="$PKG_ROOT/userdata/roms/ports/batocode-arcade"
+        mkdir -p "$PORTS_DIR/images"
+        mkdir -p "$PORTS_DIR/videos"
 
-        # Batocera .PKGINFO
-        cat <<PKGINFO > batocera-pkg/.PKGINFO
-        pkgname = makocera
+        # Copy binaries/scripts
+        cp -r "$PACKAGE_STAGE_DIR/batocode-arcade.sh" "$PKG_ROOT/userdata/roms/ports/"
+        cp -r "$PACKAGE_STAGE_DIR/batocode-arcade.sh.keys" "$PKG_ROOT/userdata/roms/ports/"
+        cp -r "$PACKAGE_STAGE_DIR/batocode-arcade/" "$PKG_ROOT/userdata/roms/ports/"
+
+        # Copy images/videos from pkgbuild
+        cp pkgbuild/images/batocode-arcade-image.png "$PORTS_DIR/images/" || true
+        cp pkgbuild/images/batocode-arcade-thumb.png "$PORTS_DIR/images/" || true
+        cp pkgbuild/videos/batocode-arcade-video.mp4 "$PORTS_DIR/videos/" || true
+
+        # Create .PKGINFO
+        cat <<PKGINFO > $PKG_ROOT/.PKGINFO
+        pkgname = batocode-arcade
         pkgver = $VERSION
-        pkgdesc = Makocera for Batocera Linux
+        pkgdesc = A makecode arcade kiosk wrapper to run own created games inside Batocera
         arch = $PKG_ARCH
         group = ports
-        packager = github-actions
-        url = https://github.com/${GITHUB_REPOSITORY}
+        packager = RAM Raiders
+        url = https://github.com/RAMRaiders/batocode-arcade
         PKGINFO
+
+        # Create .BATOEXEC
+        NOW=$(date +%Y%m%dT%H%M%S)
+        cat <<EOF > $PKG_ROOT/.BATOEXEC
+        gamelist = ports
+        <game>
+        	<path>./batocode-arcade.sh</path>
+        	<name>BatoCode Arcade</name>
+        	<desc>A makecode arcade kiosk wrapper to run own created games in Batocera</desc>
+        	<releasedate>$NOW</releasedate>
+        	<developer>RAM Raiders</developer>
+        	<publisher>RAM Raiders</publisher>
+        	<genre>Arcade</genre>
+        	<players>1-6</players>
+        	<image>./batocode-arcade/images/batocode-arcade-image.png</image>
+        	<thumb>./batocode-arcade/images/batocode-arcade-thumb.png</thumb>
+        	<video>./batocode-arcade/videos/batocode-arcade-video.mp4</video>
+        </game>
+        EOF
 
         echo "target_package_dir_name=$TARGET_PACKAGE_DIR_NAME" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
 
-    # Create a tar.gz containing Makocera.sh, Makocera.sh.keys, and the source folder
     - name: Create release tar.gz with shell, pad, and source files
       id: create_release_tar
       run: |
         cd dist/${{ steps.prepare_package.outputs.target_package_dir_name }}
-        tar -czf ../makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz Makocera.sh Makocera.sh.keys Makocera/
-        echo "release_tar_path=$PWD/../makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz" >> $GITHUB_OUTPUT
+        tar -czf ../batocode-arcade-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz batocode-arcade.sh batocode-arcade.sh.keys batocode-arcade/
+        echo "release_tar_path=$PWD/../batocode-arcade-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz" >> $GITHUB_OUTPUT
 
     - name: Create Batocera Pacman Package
       id: create_pacman_pkg
       run: |
         VERSION="${{ steps.prepare_package.outputs.version }}"
         PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
-        PKG_FILE="makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst"
+        PKG_FILE="batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst"
         tar --zstd -cf "$PKG_FILE" -C batocera-pkg .
         mkdir -p pacman-repo
         cp "$PKG_FILE" pacman-repo/
@@ -144,21 +171,21 @@ jobs:
     - name: Create pacman repo metadata (repo-add in Arch container)
       run: |
         docker run --rm -v $PWD/pacman-repo:/repo -w /repo archlinux:latest \
-          bash -c "pacman -Sy --noconfirm pacman && repo-add makocera.db.tar.gz *.pkg.tar.zst"
+          bash -c "pacman -Sy --noconfirm pacman && repo-add batocode-arcade.db.tar.gz *.pkg.tar.zst"
 
     - name: Set artifact name
       id: artifact_name
       run: |
         REF_NAME="${{ github.ref_name || github.event.pull_request.head.sha }}"
         SAFE_REF_NAME="${REF_NAME//\//-}"
-        echo "name=makocera-linux-${{ matrix.arch }}-${SAFE_REF_NAME}" >> $GITHUB_OUTPUT
+        echo "name=batocode-arcade-linux-${{ matrix.arch }}-${SAFE_REF_NAME}" >> $GITHUB_OUTPUT
 
     - name: Upload Build Artifact (for GitHub Actions UI)
       uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.artifact_name.outputs.name }}
         path: |
-          dist/makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz
+          dist/batocode-arcade-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz
           ${{ steps.create_pacman_pkg.outputs.pkg_file }}
           pacman-repo/*
         retention-days: 5
@@ -169,7 +196,7 @@ jobs:
       with:
         tag_name: ${{ github.ref_name }}
         files: |
-          dist/makocera-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz
+          dist/batocode-arcade-${{ steps.prepare_package.outputs.version }}-${{ matrix.arch }}-release.tar.gz
           ${{ steps.create_pacman_pkg.outputs.pkg_file }}
           pacman-repo/*
         append_body: true
