@@ -140,11 +140,10 @@ jobs:
         mkdir -p pacman-repo
         cp "makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst" pacman-repo/
 
-    - name: Create pacman repo metadata
+    - name: Create pacman repo metadata (repo-add in Arch container)
       run: |
-        sudo apt-get update && sudo apt-get install -y arch-install-scripts
-        cd pacman-repo
-        repo-add makocera.db.tar.gz *.pkg.tar.zst
+        docker run --rm -v $PWD/pacman-repo:/repo -w /repo archlinux:latest \
+          bash -c "pacman -Sy --noconfirm pacman && repo-add makocera.db.tar.gz *.pkg.tar.zst"
 
     - name: Upload Build Artifact (for GitHub Actions UI)
       uses: actions/upload-artifact@v4
