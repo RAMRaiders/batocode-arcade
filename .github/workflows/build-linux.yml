@@ -17,47 +17,57 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up dependencies
+      - name: Build inside Arch Linux container
         run: |
-          sudo pacman -Sy --noconfirm base-devel git devtools
+          docker run --rm -v $PWD:/workspace -w /workspace archlinux/base:latest /bin/bash -c "
+            set -e
 
-      - name: Set environment variables
-        id: vars
-        run: |
-          set -e
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            VERSION=${GITHUB_REF_NAME#v}
-          else
-            VERSION="pr-${GITHUB_SHA::7}"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+            # Update package database and install dependencies
+            pacman -Sy --noconfirm base-devel git devtools
 
-      - name: Create tarball
-        run: |
-          set -e
-          cd dist
-          TAR_NAME="batocode-arcade-${VERSION}-${{ matrix.arch }}.tar.gz"
-          tar -czf "$TAR_NAME" "batocode-arcade-linux-${{ matrix.arch }}-${VERSION}"
-          echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
-          echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
+            # Set version
+            if [[ \"${GITHUB_REF}\" == refs/tags/* ]]; then
+              VERSION=\${GITHUB_REF##refs/tags/}
+              VERSION=\${VERSION#v}
+            else
+              VERSION=\"pr-${GITHUB_SHA:0:7}\"
+            fi
+            echo \"VERSION=\$VERSION\" > version.env
 
-      - name: Create pacman package
-        run: |
-          set -e
-          PKG_ARCH="${{ matrix.arch == 'x64' && 'x86_64' || 'aarch64' }}"
-          cd batocera-pkg
-          tar --zstd -cf ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst .
+            # Create tarball
+            cd dist
+            TAR_NAME=\"batocode-arcade-\$VERSION-${{ matrix.arch }}.tar.gz\"
+            tar -czf \"\$TAR_NAME\" \"batocode-arcade-linux-${{ matrix.arch }}-\$VERSION\"
+            echo \"tarball_path=\$(pwd)/\$TAR_NAME\" > tarball.env
+            echo \"tarball_name=\$TAR_NAME\" >> tarball.env
+            cd ..
 
-      - name: Create pacman repo
+            # Create pacman package
+            PKG_ARCH=\"\"
+            if [[ \"${{ matrix.arch }}\" == \"x64\" ]]; then
+              PKG_ARCH=\"x86_64\"
+            else
+              PKG_ARCH=\"aarch64\"
+            fi
+            cd batocera-pkg
+            tar --zstd -cf ../batocode-arcade-\$VERSION-\$PKG_ARCH.pkg.tar.zst .
+            cd ..
+
+            # Create pacman repo
+            mkdir -p pacman-repo
+            cp batocode-arcade-\$VERSION-\$PKG_ARCH.pkg.tar.zst pacman-repo/
+            cd pacman-repo
+            pacman -Sy --noconfirm devtools
+            repo-add batocode-arcade.db.tar.gz batocode-arcade-\$VERSION-\$PKG_ARCH.pkg.tar.zst
+          "
+
+      - name: Load version and tarball info
+        id: load-vars
         run: |
-          set -e
-          PKG_ARCH="${{ matrix.arch == 'x64' && 'x86_64' || 'aarch64' }}"
-          mkdir -p pacman-repo
-          cp batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst pacman-repo/
-          cd pacman-repo
-          sudo pacman -Sy --noconfirm devtools
-          repo-add batocode-arcade.db.tar.gz batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst
+          cat version.env
+          cat tarball.env
+          echo "VERSION=$(grep VERSION version.env | cut -d '=' -f2)" >> $GITHUB_ENV
+          echo "tarball_name=$(grep tarball_name tarball.env | cut -d '=' -f2)" >> $GITHUB_ENV
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
