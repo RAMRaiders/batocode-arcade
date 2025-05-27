@@ -51,7 +51,7 @@ jobs:
       id: prepare_package
       run: |
         if [[ "${{ github.ref_type }}" == "tag" ]]; then
-          VERSION=${GITHUB_REF_NAME#v}
+          VERSION="${GITHUB_REF_NAME#v}"
         else
           VERSION="PR-${GITHUB_SHA::7}"
         fi
@@ -64,4 +64,131 @@ jobs:
           PKG_ARCH="aarch64"
         fi
 
-        TARGET_PACKAGE_DIR_NAME="Makocera-linux-${{ matrix.arch }}-$
+        TARGET_PACKAGE_DIR_NAME="Makocera-linux-${{ matrix.arch }}-$VERSION"
+        PACKAGE_STAGE_DIR="dist/$TARGET_PACKAGE_DIR_NAME"
+
+        mkdir -p "$PACKAGE_STAGE_DIR/Makocera"
+
+        shopt -s dotglob
+        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/Makocera/"
+        shopt -u dotglob
+
+        rmdir "dist/$SOURCE_UNPACKED_DIR"
+
+        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/Makocera.sh"
+        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
+        echo '"$DIR/Makocera/makocera" --no-sandbox' >> "$PACKAGE_STAGE_DIR/Makocera.sh"
+        chmod +x "$PACKAGE_STAGE_DIR/Makocera.sh"
+
+        cat << EOF > "$PACKAGE_STAGE_DIR/Makocera.sh.keys"
+        {
+            "actions_player1": [
+                {
+                    "trigger": [
+                        "hotkey",
+                        "start"
+                    ],
+                    "type": "key",
+                    "target": [
+                        "KEY_LEFTALT",
+                        "KEY_F4"
+                    ]
+                }
+            ]
+        }
+        EOF
+
+        # Batocera package structure
+        mkdir -p batocera-pkg/userdata/roms/ports
+        cp -r "$PACKAGE_STAGE_DIR/Makocera.sh" batocera-pkg/userdata/roms/ports/
+        cp -r "$PACKAGE_STAGE_DIR/Makocera.sh.keys" batocera-pkg/userdata/roms/ports/
+        cp -r "$PACKAGE_STAGE_DIR/Makocera/" batocera-pkg/userdata/roms/ports/
+        # Optionally: cp gamelist.xml, images, etc.
+
+        # Batocera .PKGINFO
+        cat <<PKGINFO > batocera-pkg/.PKGINFO
+        pkgname = makocera
+        pkgver = $VERSION
+        pkgdesc = Makocera for Batocera Linux
+        arch = $PKG_ARCH
+        group = ports
+        packager = github-actions
+        url = https://github.com/${GITHUB_REPOSITORY}
+        PKGINFO
+
+        echo "target_package_dir_name=$TARGET_PACKAGE_DIR_NAME" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
+
+    - name: Create final tar.gz bundle
+      id: create_tarball
+      run: |
+        VERSION="${{ steps.prepare_package.outputs.version }}"
+        TARGET_DIR_TO_TAR="${{ steps.prepare_package.outputs.target_package_dir_name }}"
+        cd dist
+        TAR_NAME="makocera-${VERSION}-${{ matrix.arch }}.tar.gz"
+        tar -czf "$TAR_NAME" "$TARGET_DIR_TO_TAR"
+        echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
+        echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
+
+    - name: Create Batocera Pacman Package
+      id: create_pacman_pkg
+      run: |
+        VERSION="${{ steps.prepare_package.outputs.version }}"
+        PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
+        tar --zstd -cf "makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst" -C batocera-pkg .
+        mkdir -p pacman-repo
+        cp "makocera-${VERSION}-${PKG_ARCH}.pkg.tar.zst" pacman-repo/
+
+    - name: Create pacman repo metadata (repo-add in Arch container)
+      run: |
+        docker run --rm -v $PWD/pacman-repo:/repo -w /repo archlinux:latest \
+          bash -c "pacman -Sy --noconfirm pacman && repo-add makocera.db.tar.gz *.pkg.tar.zst"
+
+    - name: Set artifact name
+      id: artifact_name
+      run: |
+        REF_NAME="${{ github.ref_name || github.event.pull_request.head.sha }}"
+        SAFE_REF_NAME="${REF_NAME//\//-}"
+        echo "name=makocera-linux-${{ matrix.arch }}-${SAFE_REF_NAME}" >> $GITHUB_OUTPUT
+
+    - name: Upload Build Artifact (for GitHub Actions UI)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.artifact_name.outputs.name }}
+        path: |
+          ${{ steps.create_tarball.outputs.tarball_path }}
+          makocera-*.pkg.tar.zst
+          pacman-repo/*
+        retention-days: 5
+
+    - name: Comment on PR with artifact links
+      if: github.event_name == 'pull_request'
+      uses: gavv/pull-request-artifacts@v2
+      with:
+        commit: ${{ github.event.pull_request.head.sha }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        artifacts: ${{ steps.create_tarball.outputs.tarball_path }}
+        comment-title: "📦 Makocera Build Artifacts"
+        comment-message: "Here are the latest build artifacts for this Pull Request:"
+
+    - name: Create GitHub Release and Upload Bundled Asset
+      id: create_release
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        files: |
+          ${{ steps.create_tarball.outputs.tarball_path }}
+          makocera-*.pkg.tar.zst
+        append_body: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Deploy Pacman Repo to GitHub Pages
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./pacman-repo
