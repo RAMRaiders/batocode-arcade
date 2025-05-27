@@ -151,12 +151,12 @@ jobs:
       id: sanitize_name
       run: |
         # Replace any / in ref_name or sha with -
-        SAFE_REF_NAME="${GITHUB_REF_NAME//\//-}"
-        SAFE_SHA="${GITHUB_SHA//\//-}"
-        if [[ -n "${{ github.ref_name }}" ]]; then
-          echo "ARTIFACT_REF_NAME=${SAFE_REF_NAME}" >> $GITHUB_ENV
+        if [[ -n "${GITHUB_REF_NAME}" ]]; then
+          SAFE_REF_NAME="${GITHUB_REF_NAME//\//-}"
+          echo "ARTIFACT_REF_NAME=$SAFE_REF_NAME" >> $GITHUB_ENV
         else
-          echo "ARTIFACT_REF_NAME=${SAFE_SHA}" >> $GITHUB_ENV
+          SAFE_SHA="${GITHUB_SHA//\//-}"
+          echo "ARTIFACT_REF_NAME=$SAFE_SHA" >> $GITHUB_ENV
         fi
 
     - name: Upload Build Artifact (for GitHub Actions UI)
@@ -167,18 +167,6 @@ jobs:
           ${{ steps.create_tarball.outputs.tarball_path }}
           ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
         retention-days: 5
-
-    - name: Comment on PR with artifact links
-      if: github.event_name == 'pull_request'
-      uses: gavv/pull-request-artifacts@v2
-      with:
-        commit: ${{ github.event.pull_request.head.sha }}
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        artifacts: |
-          ${{ steps.create_tarball.outputs.tarball_path }}
-          ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
-        comment-title: "📦 batocode-arcade build artifacts"
-        comment-message: "Here are the latest build artifacts for this pull request:"
 
     - name: Create GitHub Release and Upload Bundled Asset
       id: create_release
