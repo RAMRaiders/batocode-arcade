@@ -147,10 +147,22 @@ jobs:
         tar --zstd -cf ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst .
         echo "pacman_pkg_path=$(realpath ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst)" >> $GITHUB_OUTPUT
 
+    - name: Sanitize artifact name
+      id: sanitize_name
+      run: |
+        # Replace any / in ref_name or sha with -
+        SAFE_REF_NAME="${GITHUB_REF_NAME//\//-}"
+        SAFE_SHA="${GITHUB_SHA//\//-}"
+        if [[ -n "${{ github.ref_name }}" ]]; then
+          echo "ARTIFACT_REF_NAME=${SAFE_REF_NAME}" >> $GITHUB_ENV
+        else
+          echo "ARTIFACT_REF_NAME=${SAFE_SHA}" >> $GITHUB_ENV
+        fi
+
     - name: Upload Build Artifact (for GitHub Actions UI)
       uses: actions/upload-artifact@v4
       with:
-        name: batocode-arcade-linux-${{ matrix.arch }}-${{ github.ref_name || github.event.pull_request.head.sha }}
+        name: batocode-arcade-linux-${{ matrix.arch }}-${{ env.ARTIFACT_REF_NAME }}
         path: |
           ${{ steps.create_tarball.outputs.tarball_path }}
           ${{ steps.create_pacman_pkg.outputs.pacman_pkg_path }}
