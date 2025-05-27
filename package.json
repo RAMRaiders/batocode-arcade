@@ -29,8 +29,6 @@
       "package.json",
       "!node_modules/**/*"
     ],
-    "extraResource": [],
-    "extraFiles": [],
     "mac": {
       "target": "dmg",
       "icon": "assets/icon.png"
