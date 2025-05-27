@@ -26,7 +26,7 @@ jobs:
         run: npm ci
 
       - name: Build app (creates dist/)
-        run: npm run build
+        run: npm run dist
 
       - name: Prepare package directory
         run: |
@@ -44,20 +44,14 @@ jobs:
             PKG_ARCH="aarch64"
           fi
 
-          # Prepare dist artifact directory if not already
-          mkdir -p dist
-
-          # Prepare batocera-pkg structure
           mkdir -p batocera-pkg/userdata/roms/ports
 
           # Copy built app, launcher, media, gamelist.xml, etc. as needed
-          # Adjust these cp/mv lines for your actual build output/artifacts and config
           cp -r dist/linux-${{ matrix.arch }}-unpacked/* batocera-pkg/userdata/roms/ports/ || true
           cp -r resources/batocode-arcade.sh batocera-pkg/userdata/roms/ports/ || true
           cp -r resources/gamelist.xml batocera-pkg/userdata/roms/ports/ || true
           cp -r resources/batocode-arcade.png batocera-pkg/userdata/roms/ports/ || true
 
-          # Create .PKGINFO (required for Batocera pacman)
           cat <<EOF > batocera-pkg/.PKGINFO
           pkgname = batocode-arcade
           pkgver = ${VERSION}
