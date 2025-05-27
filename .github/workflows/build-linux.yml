@@ -17,59 +17,116 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build inside Arch Linux container
+      - name: Install Node and deps
         run: |
-          docker run --rm -v $PWD:/workspace -w /workspace archlinux:latest /bin/bash -c "
-            set -e
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm
 
-            # Update package database and install dependencies
-            pacman -Sy --noconfirm base-devel git devtools
+      - name: Install Node.js dependencies
+        run: npm ci
 
-            # Set version
-            if [[ \"${GITHUB_REF}\" == refs/tags/* ]]; then
-              VERSION=\${GITHUB_REF##refs/tags/}
-              VERSION=\${VERSION#v}
-            else
-              VERSION=\"pr-${GITHUB_SHA:0:7}\"
-            fi
-            echo \"VERSION=\$VERSION\" > version.env
+      - name: Build app (creates dist/)
+        run: npm run build
 
-            # Create tarball
-            cd dist
-            TAR_NAME=\"batocode-arcade-\$VERSION-${{ matrix.arch }}.tar.gz\"
-            tar -czf \"\$TAR_NAME\" \"batocode-arcade-linux-${{ matrix.arch }}-\$VERSION\"
-            echo \"tarball_path=\$(pwd)/\$TAR_NAME\" > tarball.env
-            echo \"tarball_name=\$TAR_NAME\" >> tarball.env
-            cd ..
-
-            # Create pacman package
-            PKG_ARCH=\"\"
-            if [[ \"${{ matrix.arch }}\" == \"x64\" ]]; then
-              PKG_ARCH=\"x86_64\"
-            else
-              PKG_ARCH=\"aarch64\"
-            fi
-            cd batocera-pkg
-            tar --zstd -cf ../batocode-arcade-\$VERSION-\$PKG_ARCH.pkg.tar.zst .
-            cd ..
-
-            # Create pacman repo
-            mkdir -p pacman-repo
-            cp batocode-arcade-\$VERSION-\$PKG_ARCH.pkg.tar.zst pacman-repo/
-            cd pacman-repo
-            pacman -Sy --noconfirm devtools
-            repo-add batocode-arcade.db.tar.gz batocode-arcade-\$VERSION-\$PKG_ARCH.pkg.tar.zst
-          "
-
-      - name: Load version and tarball info
-        id: load-vars
+      - name: Prepare package directory
         run: |
-          cat version.env
-          cat tarball.env
-          echo "VERSION=$(grep VERSION version.env | cut -d '=' -f2)" >> $GITHUB_ENV
-          echo "tarball_name=$(grep tarball_name tarball.env | cut -d '=' -f2)" >> $GITHUB_ENV
+          set -e
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF##refs/tags/}
+            VERSION=${VERSION#v}
+          else
+            VERSION="pr-${GITHUB_SHA:0:7}"
+          fi
 
-      - name: Upload Build Artifact
+          if [[ "${{ matrix.arch }}" == "x64" ]]; then
+            PKG_ARCH="x86_64"
+          else
+            PKG_ARCH="aarch64"
+          fi
+
+          # Prepare dist artifact directory if not already
+          mkdir -p dist
+
+          # Prepare batocera-pkg structure
+          mkdir -p batocera-pkg/userdata/roms/ports
+
+          # Copy built app, launcher, media, gamelist.xml, etc. as needed
+          # Adjust these cp/mv lines for your actual build output/artifacts and config
+          cp -r dist/linux-${{ matrix.arch }}-unpacked/* batocera-pkg/userdata/roms/ports/ || true
+          cp -r resources/batocode-arcade.sh batocera-pkg/userdata/roms/ports/ || true
+          cp -r resources/gamelist.xml batocera-pkg/userdata/roms/ports/ || true
+          cp -r resources/batocode-arcade.png batocera-pkg/userdata/roms/ports/ || true
+
+          # Create .PKGINFO (required for Batocera pacman)
+          cat <<EOF > batocera-pkg/.PKGINFO
+          pkgname = batocode-arcade
+          pkgver = ${VERSION}
+          pkgdesc = Batocode Arcade build for Batocera
+          arch = ${PKG_ARCH}
+          group = ports
+          packager = github-actions
+          url = https://github.com/${GITHUB_REPOSITORY}
+          EOF
+
+      - name: Create tarball
+        id: create_tarball
+        run: |
+          set -e
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF##refs/tags/}
+            VERSION=${VERSION#v}
+          else
+            VERSION="pr-${GITHUB_SHA:0:7}"
+          fi
+
+          TAR_NAME="batocode-arcade-${VERSION}-${{ matrix.arch }}.tar.gz"
+          tar -czf "dist/$TAR_NAME" -C dist "linux-${{ matrix.arch }}-unpacked"
+          echo "tarball_path=dist/$TAR_NAME" >> $GITHUB_OUTPUT
+          echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Batocera Pacman package
+        id: create_pacman_pkg
+        run: |
+          set -e
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF##refs/tags/}
+            VERSION=${VERSION#v}
+          else
+            VERSION="pr-${GITHUB_SHA:0:7}"
+          fi
+
+          if [[ "${{ matrix.arch }}" == "x64" ]]; then
+            PKG_ARCH="x86_64"
+          else
+            PKG_ARCH="aarch64"
+          fi
+
+          tar --zstd -cf "batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst" -C batocera-pkg .
+          echo "pacman_pkg_path=batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst" >> $GITHUB_OUTPUT
+
+      - name: Create pacman repo (optional)
+        run: |
+          set -e
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF##refs/tags/}
+            VERSION=${VERSION#v}
+          else
+            VERSION="pr-${GITHUB_SHA:0:7}"
+          fi
+
+          if [[ "${{ matrix.arch }}" == "x64" ]]; then
+            PKG_ARCH="x86_64"
+          else
+            PKG_ARCH="aarch64"
+          fi
+
+          mkdir -p pacman-repo
+          cp "batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst" pacman-repo/
+          cd pacman-repo
+          sudo apt-get update && sudo apt-get install -y arch-install-scripts
+          repo-add batocode-arcade.db.tar.gz "batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: batocode-arcade-${{ matrix.arch }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.sha) || github.ref_name }}
