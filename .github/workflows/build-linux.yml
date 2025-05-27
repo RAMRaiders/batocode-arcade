@@ -19,7 +19,7 @@ jobs:
 
       - name: Build inside Arch Linux container
         run: |
-          docker run --rm -v $PWD:/workspace -w /workspace archlinux/base:latest /bin/bash -c "
+          docker run --rm -v $PWD:/workspace -w /workspace archlinux:latest /bin/bash -c "
             set -e
 
             # Update package database and install dependencies
