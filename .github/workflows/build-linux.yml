@@ -1,180 +1,70 @@
-name: Build Linux Release
+name: Build and Package
 
 on:
   push:
-    tags:
-      - 'v*'
-  pull_request:
     branches:
       - main
-      - develop
+  pull_request:
 
 jobs:
-  build-linux:
-    permissions:
-      contents: write
-    runs-on: ubuntu-24.04
+  build:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [x64, arm64]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up QEMU (for ARM emulation)
-      if: matrix.arch == 'arm64'
-      uses: docker/setup-qemu-action@v2
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 22
-
-    - name: Cache npm dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - name: Install Node.js dependencies
-      run: npm ci
-
-    - name: Install Electron system dependencies
-      run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64
-
-    - name: Build Linux ${{ matrix.arch }} package (unpacked)
-      run: npx electron-builder --linux --${{ matrix.arch }} --dir
-
-    - name: Prepare package directory and launcher script
-      id: prepare_package
-      run: |
-        set -e
-        if [[ "${{ github.ref_type }}" == "tag" ]]; then
-          VERSION=${GITHUB_REF_NAME#v}
-        else
-          VERSION="pr-${GITHUB_SHA::7}"
-        fi
-
-        if [[ "${{ matrix.arch }}" == "x64" ]]; then
-          SOURCE_UNPACKED_DIR="linux-unpacked"
-          PKG_ARCH="x86_64"
-        else
-          SOURCE_UNPACKED_DIR="linux-${{ matrix.arch }}-unpacked"
-          PKG_ARCH="aarch64"
-        fi
-
-        TARGET_PACKAGE_DIR_NAME="batocode-arcade-linux-${{ matrix.arch }}-$VERSION"
-        PACKAGE_STAGE_DIR="dist/$TARGET_PACKAGE_DIR_NAME"
-
-        mkdir -p "$PACKAGE_STAGE_DIR/batocode-arcade"
-
-        shopt -s dotglob
-        mv "dist/$SOURCE_UNPACKED_DIR"/* "$PACKAGE_STAGE_DIR/batocode-arcade/"
-        shopt -u dotglob
-
-        rmdir "dist/$SOURCE_UNPACKED_DIR"
-
-        echo '#!/bin/bash' > "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
-        echo 'DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' >> "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
-        echo '"$DIR/batocode-arcade/batocode-arcade" --no-sandbox' >> "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
-        chmod +x "$PACKAGE_STAGE_DIR/batocode-arcade.sh"
-
-        cat << EOF > "$PACKAGE_STAGE_DIR/batocode-arcade.sh.keys"
-        {
-            "actions_player1": [
-                {
-                    "trigger": [
-                        "hotkey",
-                        "start"
-                    ],
-                    "type": "key",
-                    "target": [
-                        "KEY_LEFTALT",
-                        "KEY_F4"
-                    ]
-                }
-            ]
-        }
-        EOF
-
-        mkdir -p batocera-pkg
-        cat <<EOF > batocera-pkg/.PKGINFO
-        pkgname = batocode-arcade
-        pkgver = ${VERSION}
-        pkgdesc = Batocode Arcade build for Batocera
-        arch = ${PKG_ARCH}
-        group = ports
-        packager = github-actions
-        url = https://github.com/${GITHUB_REPOSITORY}
-        EOF
-
-        mkdir -p batocera-pkg/userdata/system/ports/batocode-arcade
-        cp -r "$PACKAGE_STAGE_DIR/"* batocera-pkg/userdata/system/ports/batocode-arcade/
-
-        echo "target_package_dir_name=$TARGET_PACKAGE_DIR_NAME" >> $GITHUB_OUTPUT
-        echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
-        echo "pkg_version=$VERSION" >> $GITHUB_OUTPUT
-
-    - name: Create final tar.gz bundle
-      id: create_tarball
-      run: |
-        set -e
-        if [[ "${{ github.ref_type }}" == "tag" ]]; then
-          VERSION=${GITHUB_REF_NAME#v}
-        else
-          VERSION="pr-${GITHUB_SHA::7}"
-        fi
-
-        cd dist
-        TAR_NAME="batocode-arcade-${VERSION}-${{ matrix.arch }}.tar.gz"
-        tar -czf "$TAR_NAME" "${{ steps.prepare_package.outputs.target_package_dir_name }}"
-        echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
-
-    - name: Build Batocera Pacman package
-      id: create_pacman_pkg
-      run: |
-        set -e
-        PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
-        VERSION="${{ steps.prepare_package.outputs.pkg_version }}"
-        cd batocera-pkg
-        tar --zstd -cf ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst .
-
-    - name: Create Pacman Repo Metadata
-      uses: addnab/docker-run-action@v3
-      with:
-        image: archlinux
-        options: -v ${{ github.workspace }}:/workspace
+      - name: Set up dependencies
         run: |
-          pacman -Sy --noconfirm devtools
-          cd /workspace
-          PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
-          VERSION="${{ steps.prepare_package.outputs.pkg_version }}"
+          sudo pacman -Sy --noconfirm base-devel git devtools
+
+      - name: Set environment variables
+        id: vars
+        run: |
+          set -e
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION="pr-${GITHUB_SHA::7}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create tarball
+        run: |
+          set -e
+          cd dist
+          TAR_NAME="batocode-arcade-${VERSION}-${{ matrix.arch }}.tar.gz"
+          tar -czf "$TAR_NAME" "batocode-arcade-linux-${{ matrix.arch }}-${VERSION}"
+          echo "tarball_path=$PWD/$TAR_NAME" >> $GITHUB_OUTPUT
+          echo "tarball_name=$TAR_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create pacman package
+        run: |
+          set -e
+          PKG_ARCH="${{ matrix.arch == 'x64' && 'x86_64' || 'aarch64' }}"
+          cd batocera-pkg
+          tar --zstd -cf ../batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst .
+
+      - name: Create pacman repo
+        run: |
+          set -e
+          PKG_ARCH="${{ matrix.arch == 'x64' && 'x86_64' || 'aarch64' }}"
           mkdir -p pacman-repo
           cp batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst pacman-repo/
           cd pacman-repo
+          sudo pacman -Sy --noconfirm devtools
           repo-add batocode-arcade.db.tar.gz batocode-arcade-${VERSION}-${PKG_ARCH}.pkg.tar.zst
 
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: batocode-arcade-${{ matrix.arch }}-${{ github.ref_name || github.sha }}
-        path: |
-          dist/*.tar.gz
-          *.pkg.tar.zst
-          pacman-repo/*
-        retention-days: 5
-
-    - name: Create GitHub Release and Upload Assets
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.ref_name }}
-        files: |
-          dist/*.tar.gz
-          *.pkg.tar.zst
-          pacman-repo/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: batocode-arcade-${{ matrix.arch }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.sha) || github.ref_name }}
+          path: |
+            dist/*.tar.gz
+            *.pkg.tar.zst
+            pacman-repo/*
+          retention-days: 5
