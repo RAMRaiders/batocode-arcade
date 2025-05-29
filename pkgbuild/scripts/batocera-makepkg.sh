@@ -178,14 +178,21 @@ function main() {
 			    i=$((i+1))
 		    done
 	    fi
-			echo "Setting permissions and ownership before packaging..."
+			echo "Setting permissions before packaging..."
 			find . -type f -exec chmod 0777 {} +
 			find . -type d -exec chmod 0777 {} +
-			chown -R root:root .
+
+			# Ensure correct ownership for packaging
+			if [[ "$EUID" -ne 0 ]] && command -v sudo &>/dev/null; then
+				echo "Using sudo to set ownership to root:root"
+				sudo chown -R 0:0 .
+			else
+				echo "Setting ownership to root:root (no sudo)"
+				chown -R 0:0 .
+			fi
 	    for a in $(get_config arch | sed "s:,: :g"); do
 		    make_pkg "$(get_config pkgname)-$(get_config pkgver)-$a"
 	    done
-
 }
 
 # calling main function

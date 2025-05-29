@@ -152,9 +152,6 @@ jobs:
           cp "$PKG_FILE" pacman-repo/
           echo "pkg_file=$PWD/$PKG_FILE" >> $GITHUB_OUTPUT
 
-      - name: Set ownership to root:root (after package creation)
-        run: sudo chown -R 0:0 ${{ steps.prepare_package.outputs.pkg_root }}
-
       - name: Package Linux release tarball
         run: |
           VERSION_WITH_REL="${{ steps.prepare_package.outputs.version_with_rel }}"
