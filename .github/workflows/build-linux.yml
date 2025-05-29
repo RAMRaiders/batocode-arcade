@@ -224,6 +224,7 @@ jobs:
             repo-db-x86_64/*
 
   deploy-repo:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: update-repo-db
     runs-on: ubuntu-24.04
     steps:
@@ -244,3 +245,33 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./pacman-repo
+
+    comment-on-pr:
+    if: github.event_name == 'pull_request'
+    needs: update-repo-db
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download pacman artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pacman-repo-final
+          path: ./pacman-repo
+
+      - name: List packages and collect links
+        id: collect_pkgs
+        run: |
+          echo "## 🧪 Pacman Test Packages Generated:" > pr_comment.md
+          echo "" >> pr_comment.md
+          echo "**You can download and test these packages for this PR:**" >> pr_comment.md
+          echo "" >> pr_comment.md
+
+          find ./pacman-repo -name "*.pkg.tar.zst" | while read pkg; do
+            base=$(basename "$pkg")
+            echo "- [$base](https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}/artifacts)" >> pr_comment.md
+          done
+
+      - name: Post comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: pr_comment.md
