@@ -1,0 +1,43 @@
+# Node modules
+node_modules/
+
+# Build output
+out/
+dist/
+
+# Compiled TypeScript
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+
+# Electron build artifacts
+/build/
+/release/
+/*.log
+
+# VSCode
+.vscode/
+
+# macOS app artifacts
+*.dmg
+*.app
+*.DS_Store
+
+# Windows app artifacts
+*.exe
+*.dll
+*.msi
+
+# TypeScript cache
+.cache/

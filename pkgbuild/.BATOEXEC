@@ -1,0 +1,24 @@
+gamelist = ports
+<game>
+	<path>./batocode-arcade.sh</path>
+	<name>BatoCode Arcade</name>
+	<desc>BatoCode Arcade is a streamlined Linux desktop client purpose-built to transform your MakeCode Arcade games into a seamless kiosk-style experience.
+		Designed for plug-and-play simplicity, it launches your exported games in fullscreen, sandbox-free Electron environments — perfect for arcades, exhibits, classrooms, and embedded devices like Raspberry Pi.
+		Whether you are showcasing a single game or building a curated collection, BatoCode Arcade offers a focused, distraction-free launcher optimized for gamepad or minimal input navigation.
+		Pair it with Batocera to bring your MakeCode creations to life on real arcade hardware.</desc>
+	<image>./images/batocode-arcade-image.png</image>
+	<video>./videos/batocode-arcade-video.mp4</video>
+	<marquee>./images/batocode-arcade-marquee.png</marquee>
+	<thumbnail>./images/batocode-arcade-thumb.png</thumbnail>
+	<fanart>./images/batocode-arcade-fanart.png</fanart>
+	<rating>5</rating>
+	<releasedate>20250527T230525</releasedate>
+	<developer>RAM Raiders</developer>
+	<publisher>RAM Raiders</publisher>
+	<genre>Various</genre>
+	<arcadesystemname>Microsoft Make Code Arcade Kiosk</arcadesystemname>
+	<players>1-4</players>
+	<kidgame>true</kidgame>
+	<lang>en</lang>
+	<region>World</region>
+</game>
