@@ -246,7 +246,7 @@ jobs:
           publish_branch: gh-pages
           publish_dir: ./pacman-repo
 
-    comment-on-pr:
+  comment-on-pr:
     if: github.event_name == 'pull_request'
     needs: update-repo-db
     runs-on: ubuntu-24.04
