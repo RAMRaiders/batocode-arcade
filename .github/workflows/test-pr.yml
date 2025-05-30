@@ -89,6 +89,8 @@ jobs:
           cp pkgbuild/images/batocode-arcade-thumb.png "$PORTS_DIR/images/" || true
           cp pkgbuild/images/batocode-arcade-marquee.png "$PORTS_DIR/images/" || true
           cp pkgbuild/videos/batocode-arcade-video.mp4 "$PORTS_DIR/videos/" || true
+          cp pkgbuild/.BATOEXEC "$PKG_ROOT/.BATOEXEC"
+
 
           cat <<PKGINFO > "$PKG_ROOT/.PKGINFO"
           pkgname = ports-batocode-arcade
