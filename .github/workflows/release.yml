@@ -54,13 +54,7 @@ jobs:
         id: prepare_package
         run: |
           set -e
-          sudo apt-get update && sudo apt-get install -y dos2unix
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="PR-${GITHUB_SHA::7}"
-          fi
-
+          VERSION="${GITHUB_REF_NAME#v}"
           PKGREL="1"
           VERSION_WITH_REL="${VERSION}-${PKGREL}"
 
@@ -108,12 +102,8 @@ jobs:
 
           PKGINFO
 
-          dos2unix "$PKG_ROOT/.PKGINFO"
-
           # Set directory permissions to match Batocera (0777) to avoid pacman warnings
-          chmod 0777 "$PKG_ROOT/userdata"
-          chmod 0777 "$PKG_ROOT/userdata/roms"
-          chmod -R 0777 "$PKG_ROOT/userdata/roms/ports"
+          chmod 0777 "$PKG_ROOT"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "version_with_rel=$VERSION_WITH_REL" >> $GITHUB_OUTPUT
@@ -151,17 +141,38 @@ jobs:
             -C "${{ steps.prepare_package.outputs.pkg_root }}/userdata/roms/ports/batocode-arcade" .
           echo "release_tarball=batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}-release.tar.gz" >> $GITHUB_OUTPUT
 
+      - name: Upload Linux release tarball for ${{ matrix.arch }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-tarball-${{ matrix.arch }}
+          path: batocode-arcade-*.tar.gz
+
       - name: Upload pacman repo artifacts for this arch
         uses: actions/upload-artifact@v4
         with:
           name: pacman-repo-${{ matrix.arch }}
           path: pacman-repo/*
 
-      - name: Upload Linux binaries to release (create or update)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+  publish-release:
+    needs: build-linux
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download x86_64 tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: release-tarball-x86_64
+          path: ./artifacts
+
+      - name: Download aarch64 tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: release-tarball-aarch64
+          path: ./artifacts
+
+      - name: Upload both release tarballs to single GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: batocode-arcade-${{ steps.prepare_package.outputs.version_with_rel }}-${{ steps.prepare_package.outputs.pkg_arch }}-release.tar.gz
+          files: ./artifacts/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

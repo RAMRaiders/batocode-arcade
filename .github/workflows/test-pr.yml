@@ -38,7 +38,7 @@ jobs:
       - name: Ensure dist folder exists
         run: mkdir -p dist
 
-      - name: Build Linux ${{ matrix.arch }} package (unpacked)
+      - name: Build Linux for ${{ matrix.arch }} package
         run: |
           if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
             npx electron-builder --linux --x64 --dir
@@ -49,16 +49,11 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare package directory, media, and launcher script
+      - name: Prepare pkg directory, media files, gamelist, padtokey file and launcher script
         id: prepare_package
         run: |
           set -e
-          sudo apt-get update && sudo apt-get install -y dos2unix
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION="PR-${GITHUB_SHA::7}"
-          fi
+          VERSION="PR-${GITHUB_SHA::7}"
 
           PKGREL="1"
           VERSION_WITH_REL="${VERSION}-${PKGREL}"
@@ -95,12 +90,6 @@ jobs:
           cp pkgbuild/images/batocode-arcade-marquee.png "$PORTS_DIR/images/" || true
           cp pkgbuild/videos/batocode-arcade-video.mp4 "$PORTS_DIR/videos/" || true
 
-          cp pkgbuild/.BATOEXEC "$PKG_ROOT/.BATOEXEC"
-          # Clean up .BATOEXEC: Remove <playcount>, <lastplayed>, <gametime>, <thumb>
-          # and fix region if needed (replace "W" with "World")
-          sed -i '/<playcount>/d;/<lastplayed>/d;/<gametime>/d;/<thumb>/d;s/<region>W<\/region>/<region>World<\/region>/' "$PKG_ROOT/.BATOEXEC"
-          dos2unix "$PKG_ROOT/.BATOEXEC"
-
           cat <<PKGINFO > "$PKG_ROOT/.PKGINFO"
           pkgname = ports-batocode-arcade
           pkgver = $VERSION_WITH_REL
@@ -117,7 +106,7 @@ jobs:
           echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
           echo "pkg_root=$PKG_ROOT" >> $GITHUB_OUTPUT
 
-      - name: Create Batocera Pacman Package using batocera-makepkg
+      - name: Create Batocera Pacman Package with batocera-makepkg script
         id: create_pacman_pkg
         run: |
           set -e
@@ -140,70 +129,21 @@ jobs:
           cp "$PKG_FILE" pacman-repo/
           echo "pkg_file=$PWD/$PKG_FILE" >> $GITHUB_OUTPUT
 
-      - name: Package Linux release tarball
+      - name: Package Linux build tarball
         run: |
           VERSION_WITH_REL="${{ steps.prepare_package.outputs.version_with_rel }}"
           PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
-          tar -czvf "batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}-release.tar.gz" \
+          tar -czvf "batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}.tar.gz" \
             -C "${{ steps.prepare_package.outputs.pkg_root }}/userdata/roms/ports/batocode-arcade" .
-          echo "release_tarball=batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}-release.tar.gz" >> $GITHUB_OUTPUT
 
-      - name: Upload pacman repo artifacts for this arch
+      - name: Upload Linux build tarball for ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: pacman-repo-${{ matrix.arch }}
-          path: pacman-repo/*
+          name: build-${{ matrix.arch }}.tar.gz
+          path: batocode-arcade-*.tar.gz
 
-      - name: Upload Linux binaries to release (create or update)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: batocode-arcade-${{ steps.prepare_package.outputs.version_with_rel }}-${{ steps.prepare_package.outputs.pkg_arch }}-release.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  update-repo-db:
-    needs: build-linux
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download pacman-repo artifacts from all archs
-        uses: actions/download-artifact@v4
-        with:
-          pattern: pacman-repo-*
-          path: ./pacman-repo
-          merge-multiple: false
-
-      - name: Prepare per-arch repo-db directories
-        run: |
-          set -e
-          mkdir -p repo-db-aarch64 repo-db-x86_64
-          cp pacman-repo/pacman-repo-aarch64/*.pkg.tar.zst repo-db-aarch64/
-          cp pacman-repo/pacman-repo-x86_64/*.pkg.tar.zst repo-db-x86_64/
-
-      - name: Re-create repo-add database for aarch64
-        run: |
-          cd repo-db-aarch64
-          rm -f *.db* *.files*
-          docker run --rm -v "$PWD":/repo -w /repo archlinux:latest \
-            bash -c "repo-add batocode-arcade.db.tar.gz *.pkg.tar.zst"
-          echo "== aarch64 DB architectures =="
-          tar -xOf batocode-arcade.db.tar.gz | grep '^arch =' || true
-          echo "=============================="
-
-      - name: Re-create repo-add database for x86_64
-        run: |
-          cd repo-db-x86_64
-          rm -f *.db* *.files*
-          docker run --rm -v "$PWD":/repo -w /repo archlinux:latest \
-            bash -c "repo-add batocode-arcade.db.tar.gz *.pkg.tar.zst"
-          echo "== x86_64 DB architectures =="
-          tar -xOf batocode-arcade.db.tar.gz | grep '^arch =' || true
-          echo "============================"
-
-      - name: Upload final pacman repos for pages (per-arch)
+      - name: Upload .zst Pacman package for ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: pacman-repo-final
-          path: |
-            repo-db-aarch64/*
-            repo-db-x86_64/*
+          name: pacman-pkg-${{ matrix.arch }}.pkg.tar.zst
+          path: pacman-repo/*.pkg.tar.zst
