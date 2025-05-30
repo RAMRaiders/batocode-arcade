@@ -178,10 +178,7 @@ function main() {
 			    i=$((i+1))
 		    done
 	    fi
-			echo "Setting permissions and ownership before packaging..."
-			find . -type f -exec chmod 0777 {} +
-			find . -type d -exec chmod 0777 {} +
-			chown -R root:root .
+
 	    for a in $(get_config arch | sed "s:,: :g"); do
 		    make_pkg "$(get_config pkgname)-$(get_config pkgver)-$a"
 	    done
