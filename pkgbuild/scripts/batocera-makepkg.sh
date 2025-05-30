@@ -120,9 +120,9 @@ function make_pkg() {
 	echo "Creating package $pk ..."
 	LST_BATOEXEC=( $(ls "$BATOEXEC"* 2>/dev/null) )
 	if ! [[ -z "${LST_BATOEXEC[@]}" ]]; then
-	    tar -cf - "$INFO" "$BATOEXEC"* * | zstd -c --rsyncable - -o "$pk"
+	    tar --owner=0 --group=0 -cf - "$INFO" "$BATOEXEC"* * | zstd -c --rsyncable - -o "$pk"
 	else
-	    tar -cf - "$INFO" * | zstd -c --rsyncable - -o "$pk"
+	    tar --owner=0 --group=0 -cf - "$INFO" * | zstd -c --rsyncable - -o "$pk"
 	fi
 	ret=$?
 	chmod go+r "$pk" 2>/dev/null
@@ -178,21 +178,11 @@ function main() {
 			    i=$((i+1))
 		    done
 	    fi
-			echo "Setting permissions before packaging..."
-			find . -type f -exec chmod 0777 {} +
-			find . -type d -exec chmod 0777 {} +
 
-			# Ensure correct ownership for packaging
-			if [[ "$EUID" -ne 0 ]] && command -v sudo &>/dev/null; then
-				echo "Using sudo to set ownership to root:root"
-				sudo chown -R 0:0 .
-			else
-				echo "Setting ownership to root:root (no sudo)"
-				chown -R 0:0 .
-			fi
 	    for a in $(get_config arch | sed "s:,: :g"); do
 		    make_pkg "$(get_config pkgname)-$(get_config pkgver)-$a"
 	    done
+
 }
 
 # calling main function
