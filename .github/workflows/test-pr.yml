@@ -91,7 +91,6 @@ jobs:
           cp pkgbuild/videos/batocode-arcade-video.mp4 "$PORTS_DIR/videos/" || true
           cp pkgbuild/.BATOEXEC "$PKG_ROOT/.BATOEXEC"
 
-
           cat <<PKGINFO > "$PKG_ROOT/.PKGINFO"
           pkgname = ports-batocode-arcade
           pkgver = $VERSION_WITH_REL
