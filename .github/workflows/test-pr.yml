@@ -140,5 +140,11 @@ jobs:
       - name: Upload Linux release tarball for ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: release-tarball-${{ matrix.arch }}
+          name: build-tarball-${{ matrix.arch }}
           path: batocode-arcade-*.tar.gz
+
+      - name: Upload .zst Pacman package for ${{ matrix.arch }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacman-package-${{ matrix.arch }}
+          path: pacman-repo/*.pkg.tar.zst
