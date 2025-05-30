@@ -164,10 +164,18 @@ jobs:
           echo "release_tarball=batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}-release.tar.gz" >> $GITHUB_OUTPUT
 
       - name: Upload pacman repo artifacts for this arch
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: pacman-repo-${{ matrix.arch }}
           path: pacman-repo/*
+
+      - name: Upload PR-only flat artifact for nightly.link
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacman-flat-${{ matrix.arch }}
+          path: pacman-repo/*.pkg.tar.zst
 
       - name: Upload Linux binaries to release (create or update)
         if: startsWith(github.ref, 'refs/tags/')
@@ -270,7 +278,7 @@ jobs:
           for arch in x86_64 aarch64; do
             # Use wildcard for the tarball (it won't be in pacman-repo)
             TAR_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/batocode-arcade-*-${arch}-test.tar.gz"
-            
+
             ZST_FILE=$(ls pacman-repo/pacman-repo-$arch/*.pkg.tar.zst | head -n1 | xargs basename)
             ZST_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/pacman-repo-${arch}/$ZST_FILE"
 
