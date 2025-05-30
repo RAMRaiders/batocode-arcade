@@ -1,12 +1,8 @@
 name: Build Linux Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   pull_request:
     branches:
-      - main
       - develop
 
 jobs:
@@ -14,7 +10,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      pages: write
       id-token: write
 
     strategy:
@@ -117,13 +112,6 @@ jobs:
 
           PKGINFO
 
-          dos2unix "$PKG_ROOT/.PKGINFO"
-
-          # Set directory permissions to match Batocera (0777) to avoid pacman warnings
-          chmod 0777 "$PKG_ROOT/userdata"
-          chmod 0777 "$PKG_ROOT/userdata/roms"
-          chmod -R 0777 "$PKG_ROOT/userdata/roms/ports"
-
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "version_with_rel=$VERSION_WITH_REL" >> $GITHUB_OUTPUT
           echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
@@ -151,9 +139,6 @@ jobs:
           mkdir -p pacman-repo
           cp "$PKG_FILE" pacman-repo/
           echo "pkg_file=$PWD/$PKG_FILE" >> $GITHUB_OUTPUT
-
-      - name: Set ownership to root:root (after package creation)
-        run: sudo chown -R 0:0 ${{ steps.prepare_package.outputs.pkg_root }}
 
       - name: Package Linux release tarball
         run: |
@@ -222,25 +207,3 @@ jobs:
           path: |
             repo-db-aarch64/*
             repo-db-x86_64/*
-
-  deploy-repo:
-    needs: update-repo-db
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download pacman repo dbs
-        uses: actions/download-artifact@v4
-        with:
-          name: pacman-repo-final
-          path: ./pacman-repo
-
-      - name: Add .nojekyll to both repos
-        run: |
-          touch ./pacman-repo/repo-db-aarch64/.nojekyll
-          touch ./pacman-repo/repo-db-x86_64/.nojekyll
-
-      - name: Deploy Pacman Repos to GitHub Pages (per-arch folders)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./pacman-repo
