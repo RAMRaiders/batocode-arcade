@@ -262,11 +262,11 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - name: Download pacman-repo artifacts
+      - name: Download flat pacman artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: pacman-repo-*
-          path: ./pacman-repo
+          pattern: pacman-flat-*
+          path: ./pacman-flat
           merge-multiple: false
 
       - name: Format artifact links
@@ -276,17 +276,15 @@ jobs:
 
           MSG="### 🔗 Batocode Arcade Test Builds for PR #${{ github.event.pull_request.number }}\n"
           for arch in x86_64 aarch64; do
-            # Use wildcard for the tarball (it won't be in pacman-repo)
             TAR_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/batocode-arcade-*-${arch}-test.tar.gz"
 
-            ZST_FILE=$(ls pacman-repo/pacman-repo-$arch/*.pkg.tar.zst | head -n1 | xargs basename)
-            ZST_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/pacman-repo-${arch}/$ZST_FILE"
+            ZST_FILE=$(ls pacman-flat/pacman-flat-$arch/*.pkg.tar.zst | head -n1 | xargs basename)
+            ZST_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/pacman-flat-${arch}/${ZST_FILE}"
 
             MSG+="\n**🖥️ Architecture:** \`${arch}\`\n"
             MSG+="- [🗜️ Test Tarball (.tar.gz)]($TAR_URL)\n"
             MSG+="- [📦 Test Pacman Package (.pkg.tar.zst)]($ZST_URL)\n"
           done
-
           echo -e "$MSG" > pr-comment.txt
 
       - name: Post or update comment on PR
