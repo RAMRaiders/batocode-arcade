@@ -76,6 +76,17 @@ jobs:
           mkdir -p "$PORTS_DIR/images"
           mkdir -p "$PORTS_DIR/videos"
 
+          LOCALES_DIR="dist/$SOURCE_UNPACKED_DIR/locales"
+
+          if [ -d "$LOCALES_DIR" ]; then
+            echo "Removing all language .pak files except English US from $LOCALES_DIR"
+            
+            # Delete all .pak files except English (en-US.pak)
+            find "$LOCALES_DIR" -type f -name "*.pak" ! -name "en-US.pak" -exec rm -v {} \;
+          else
+            echo "Locales directory not found at $LOCALES_DIR, skipping language cleanup"
+          fi
+
           shopt -s dotglob
           mv "dist/$SOURCE_UNPACKED_DIR"/* "$GAME_DIR/"
           shopt -u dotglob
