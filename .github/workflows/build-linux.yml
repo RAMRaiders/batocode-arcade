@@ -272,7 +272,7 @@ jobs:
             TAR_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/batocode-arcade-*-${arch}-test.tar.gz"
             
             ZST_FILE=$(ls pacman-repo/pacman-repo-$arch/*.pkg.tar.zst | head -n1 | xargs basename)
-            ZST_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/$ZST_FILE"
+            ZST_URL="https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/pacman-repo-${arch}/$ZST_FILE"
 
             MSG+="\n**🖥️ Architecture:** \`${arch}\`\n"
             MSG+="- [🗜️ Test Tarball (.tar.gz)]($TAR_URL)\n"
