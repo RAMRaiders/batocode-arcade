@@ -38,7 +38,7 @@ jobs:
       - name: Ensure dist folder exists
         run: mkdir -p dist
 
-      - name: Build Linux ${{ matrix.arch }} package (unpacked)
+      - name: Build Linux for ${{ matrix.arch }} package
         run: |
           if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
             npx electron-builder --linux --x64 --dir
@@ -49,7 +49,7 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare package directory, media, and launcher script
+      - name: Prepare pkg directory, media files, gamelist, padtokey file and launcher script
         id: prepare_package
         run: |
           set -e
@@ -106,7 +106,7 @@ jobs:
           echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
           echo "pkg_root=$PKG_ROOT" >> $GITHUB_OUTPUT
 
-      - name: Create Batocera Pacman Package using batocera-makepkg
+      - name: Create Batocera Pacman Package with batocera-makepkg script
         id: create_pacman_pkg
         run: |
           set -e
@@ -129,22 +129,21 @@ jobs:
           cp "$PKG_FILE" pacman-repo/
           echo "pkg_file=$PWD/$PKG_FILE" >> $GITHUB_OUTPUT
 
-      - name: Package Linux release tarball
+      - name: Package Linux build tarball
         run: |
           VERSION_WITH_REL="${{ steps.prepare_package.outputs.version_with_rel }}"
           PKG_ARCH="${{ steps.prepare_package.outputs.pkg_arch }}"
-          tar -czvf "batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}-release.tar.gz" \
+          tar -czvf "batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}.tar.gz" \
             -C "${{ steps.prepare_package.outputs.pkg_root }}/userdata/roms/ports/batocode-arcade" .
-          echo "release_tarball=batocode-arcade-${VERSION_WITH_REL}-${PKG_ARCH}-release.tar.gz" >> $GITHUB_OUTPUT
 
-      - name: Upload Linux release tarball for ${{ matrix.arch }}
+      - name: Upload Linux build tarball for ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: build-tarball-${{ matrix.arch }}
+          name: build-${{ matrix.arch }}.tar.gz
           path: batocode-arcade-*.tar.gz
 
       - name: Upload .zst Pacman package for ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
-          name: pacman-package-${{ matrix.arch }}
+          name: pacman-pkg-${{ matrix.arch }}.pkg.tar.zst
           path: pacman-repo/*.pkg.tar.zst
