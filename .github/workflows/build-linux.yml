@@ -59,6 +59,12 @@ jobs:
           arch: ${{ matrix.arch }}
           version: ${{ inputs.version }}
 
+      - name: Debug: Show script path
+        run: |
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          ls -al "${GITHUB_WORKSPACE}/pkgbuild/scripts"
+          file "${GITHUB_WORKSPACE}/pkgbuild/scripts/batocera-makepkg.sh" || echo "Script not found"
+
       - name: Create Batocera Pacman Package using batocera-makepkg
         id: create_pacman_pkg
         run: |
