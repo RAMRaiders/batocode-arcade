@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Install Electron system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64 dos2unix
 
       - name: Ensure dist folder exists
         run: mkdir -p dist
@@ -71,7 +71,7 @@ jobs:
           popd
 
           # Package is created one level up from $PKG_ROOT
-          PKG_FILE=$(find .. -maxdepth 1 -name "ports-batocode-arcade-*.pkg.tar.zst" | head -n1)
+          PKG_FILE=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -name "ports-batocode-arcade-*.pkg.tar.zst" | head -n1)
 
           if [[ ! -f "$PKG_FILE" ]]; then
             echo "ERROR: Package not created!"
