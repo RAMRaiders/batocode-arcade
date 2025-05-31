@@ -10,6 +10,17 @@
         "KEY_LEFTALT",
         "KEY_F4"
       ]
+    },
+    {
+      "trigger": [
+        "a",
+        "hotkey"
+      ],
+      "type": "key",
+      "target": [
+        "KEY_LEFTSHIFT",
+        "KEY_F5"
+      ]
     }
   ]
 }

@@ -42,6 +42,13 @@ process.on('SIGTERM', () => {
 app.whenReady().then(() => {
   createWindow();
 
+  globalShortcut.register('Shift+F5', () => {
+    console.log('Shift+F5 pressed – Reloading...');
+    if (win && !win.isDestroyed()) {
+      win.reload();
+    }
+  });
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
