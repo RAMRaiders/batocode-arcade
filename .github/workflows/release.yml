@@ -59,8 +59,8 @@ jobs:
         run: |
           set -e
           mkdir -p aarch64 x86_64
-          cp pacman-repo/aarch64/*.pkg.tar.zst aarch64/
-          cp pacman-repo/x86_64/*.pkg.tar.zst x86_64/
+          cp pacman-repo/pacman-pkg-aarch64/*.pkg.tar.zst aarch64/
+          cp pacman-repo/pacman-pkg-x86_64/*.pkg.tar.zst x86_64/
 
       - name: Re-create repo-add database for aarch64
         run: |
