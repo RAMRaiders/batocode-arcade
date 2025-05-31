@@ -59,7 +59,7 @@ jobs:
           arch: ${{ matrix.arch }}
           version: ${{ inputs.version }}
 
-      - name: Debug: Show script path
+      - name: Debug Show script path
         run: |
           echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
           ls -al "${GITHUB_WORKSPACE}/pkgbuild/scripts"
