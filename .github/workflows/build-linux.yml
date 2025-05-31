@@ -78,8 +78,8 @@ jobs:
             exit 1
           fi
 
-          mkdir -p pacman-repo
-          cp "$PKG_FILE" pacman-repo/
+          mkdir -p pacman-repo/${{ matrix.arch }}
+          cp "$PKG_FILE" pacman-repo/${{ matrix.arch }}/
           echo "pkg_file=$PWD/$PKG_FILE" >> $GITHUB_OUTPUT
 
       - name: Package Linux release tarball
