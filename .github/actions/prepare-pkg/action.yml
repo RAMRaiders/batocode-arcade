@@ -17,9 +17,9 @@ outputs:
     value: ${{ steps.prepare.outputs.version_with_rel }}
 runs:
   using: "composite"
-  id: prepare
   steps:
-    - run: |
+    - id: prepare
+      run: |
         set -e
         VERSION="${{ inputs.version }}"
         PKGREL="1"
