@@ -9,9 +9,9 @@ function createWindow() {
     show: false,
     backgroundColor: '#000000',
     webPreferences: {
-      nodeIntegration: false,
+      nodeIntegration: true,
       contextIsolation: false,
-      webSecurity: false
+      webSecurity: true
     }
   });
 
