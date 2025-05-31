@@ -6,12 +6,15 @@ inputs:
   version:
     required: true
 outputs:
-  version_with_rel:
-    description: Full version with pkgrel
-  pkg_arch:
-    description: Architecture string for package
   pkg_root:
-    description: Path to the root of the prepared package
+    description: "Path to the package root"
+    value: ${{ steps.prepare.outputs.pkg_root }}
+  pkg_arch:
+    description: "Arch name for the package"
+    value: ${{ steps.prepare.outputs.pkg_arch }}
+  version_with_rel:
+    description: "Version with release tag"
+    value: ${{ steps.prepare.outputs.version_with_rel }}
 runs:
   using: "composite"
   steps:
