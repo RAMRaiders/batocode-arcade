@@ -59,35 +59,19 @@ jobs:
           arch: ${{ matrix.arch }}
           version: ${{ inputs.version }}
 
-      - name: Debug Show script path
-        run: |
-          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
-          ls -al "${GITHUB_WORKSPACE}/pkgbuild/scripts"
-          file "${GITHUB_WORKSPACE}/pkgbuild/scripts/batocera-makepkg.sh" || echo "Script not found"
-
       - name: Create Batocera Pacman Package using batocera-makepkg
         id: create_pacman_pkg
         run: |
           set -e
-
-          echo "PKG_ROOT = ${{ steps.prepare_package.outputs.pkg_root }}"
           PKG_ROOT="${{ steps.prepare_package.outputs.pkg_root }}"
-          SCRIPT_PATH="${GITHUB_WORKSPACE}/pkgbuild/scripts/batocera-makepkg.sh"
+          chmod +x pkgbuild/scripts/batocera-makepkg.sh
 
-          if [[ ! -d "$PKG_ROOT" ]]; then
-            echo "ERROR: PKG_ROOT does not exist: $PKG_ROOT"
-            exit 1
-          fi
+          pushd "$PKG_ROOT"
+          bash "../pkgbuild/scripts/batocera-makepkg.sh"
+          popd
 
-          if [[ ! -f "$SCRIPT_PATH" ]]; then
-            echo "ERROR: Script not found: $SCRIPT_PATH"
-            exit 1
-          fi
-
-          chmod +x "$SCRIPT_PATH"
-          bash "$SCRIPT_PATH" "$PKG_ROOT"
-
-          PKG_FILE=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -name "ports-batocode-arcade-*.pkg.tar.zst" | head -n1)
+          # Package is created one level up from $PKG_ROOT
+          PKG_FILE=$(find .. -maxdepth 1 -name "ports-batocode-arcade-*.pkg.tar.zst" | head -n1)
 
           if [[ ! -f "$PKG_FILE" ]]; then
             echo "ERROR: Package not created!"
