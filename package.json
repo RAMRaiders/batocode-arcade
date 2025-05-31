@@ -2,7 +2,7 @@
   "name": "batocode-arcade",
   "description": "A Chromium-based Electron app that runs MakeCode Arcade games in Kiosk mode on Batocera.",
   "author": "RAM Raiders",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "main": "src/index.js",
   "scripts": {
     "start": "electron .",
