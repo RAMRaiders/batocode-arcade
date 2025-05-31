@@ -67,7 +67,7 @@ jobs:
           chmod +x pkgbuild/scripts/batocera-makepkg.sh
 
           pushd "$PKG_ROOT"
-          bash "../pkgbuild/scripts/batocera-makepkg.sh"
+          bash "${GITHUB_WORKSPACE}/pkgbuild/scripts/batocera-makepkg.sh"
           popd
 
           # Package is created one level up from $PKG_ROOT
