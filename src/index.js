@@ -1,5 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 
+app.commandLine.appendSwitch('lang', 'en-US');
+
 function createWindow() {
   const win = new BrowserWindow({
     fullscreen: true,
@@ -7,9 +9,9 @@ function createWindow() {
     show: false,
     backgroundColor: '#000000',
     webPreferences: {
-      nodeIntegration: false,
+      nodeIntegration: true,
       contextIsolation: false,
-      webSecurity: false
+      webSecurity: true
     }
   });
 
@@ -22,7 +24,9 @@ function createWindow() {
     win.show();
   });
 
-  win.on('closed', () => app.quit());
+  win.on('closed', () => {
+    app.quit();
+  });
 }
 
 process.on('SIGINT', () => {
