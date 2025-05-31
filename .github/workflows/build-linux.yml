@@ -101,5 +101,5 @@ jobs:
       - name: Upload pacman repo artifacts for this arch
         uses: actions/upload-artifact@v4
         with:
-          name: pacman-pkg-${{ matrix.arch }}
-          path: pacman-repo/*
+          name: ${{ matrix.arch }}
+          path: pacman-repo/${{ matrix.arch }}
