@@ -120,9 +120,9 @@ function make_pkg() {
 	echo "Creating package $pk ..."
 	LST_BATOEXEC=( $(ls "$BATOEXEC"* 2>/dev/null) )
 	if ! [[ -z "${LST_BATOEXEC[@]}" ]]; then
-	    tar --owner=0 --group=0 -cf - "$INFO" "$BATOEXEC"* * | zstd -c --rsyncable - -o "$pk"
+	    tar -cf - "$INFO" "$BATOEXEC"* * | zstd -c --rsyncable - -o "$pk"
 	else
-	    tar --owner=0 --group=0 -cf - "$INFO" * | zstd -c --rsyncable - -o "$pk"
+	    tar -cf - "$INFO" * | zstd -c --rsyncable - -o "$pk"
 	fi
 	ret=$?
 	chmod go+r "$pk" 2>/dev/null
@@ -178,7 +178,7 @@ function main() {
 			    i=$((i+1))
 		    done
 	    fi
-
+			chmod -R 0777 /userdata
 	    for a in $(get_config arch | sed "s:,: :g"); do
 		    make_pkg "$(get_config pkgname)-$(get_config pkgver)-$a"
 	    done

@@ -21,6 +21,16 @@
         "KEY_LEFTSHIFT",
         "KEY_F5"
       ]
+    },
+    {
+      "trigger": [
+        "select",
+        "hotkey"
+      ],
+      "type": "key",
+      "target": [
+        "KEY_F12"
+      ]
     }
   ]
 }

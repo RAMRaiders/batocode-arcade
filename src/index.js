@@ -54,10 +54,14 @@ app.whenReady().then(() => {
   createWindow();
 
   globalShortcut.register('Shift+F5', () => {
-    console.log('Shift+F5 pressed – Reloading...');
+    console.log('Reloading...');
     if (win && !win.isDestroyed()) {
       win.reload();
     }
+  });
+
+  globalShortcut.register('F12', () => {
+    win.webContents.toggleDevTools();
   });
 
   app.on('activate', () => {
