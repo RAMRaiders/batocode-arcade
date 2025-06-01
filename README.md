@@ -45,7 +45,7 @@ To use **BatoCode-Arcade**, make sure your setup meets the following prerequisit
 To install BatoCode-Arcade quickly and easily, open your Batocera terminal — either locally or via SSH — and run the following command:
 
 ```bash
-arch=$(uname -m); grep -q "\[batocode-arcade\]" /userdata/system/pacman/pacman.conf || echo -e "\n[batocode-arcade]\nSigLevel = Optional TrustAll\nServer = https://ramraiders.github.io/batocode-arcade/repo-db-$arch" >> /userdata/system/pacman/pacman.conf && pacman -Sy && pacman -S --noconfirm ports-batocode-arcade
+arch=$(uname -m); grep -q "\[batocode-arcade\]" /userdata/system/pacman/pacman.conf || echo -e "\n[batocode-arcade]\nSigLevel = Optional TrustAll\nServer = https://ramraiders.github.io/batocode-arcade/$arch" >> /userdata/system/pacman/pacman.conf && pacman -Sy && pacman -S --noconfirm ports-batocode-arcade
 ```
 
 This command will:
