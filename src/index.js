@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut } = require('electron');
+import { app, BrowserWindow, globalShortcut } from 'electron';
 
 app.commandLine.appendSwitch('lang', 'en-US');
 
@@ -32,6 +32,12 @@ function createWindow() {
     win = null;
     app.quit();
   });
+
+  win.webContents.session.webRequest.onCompleted((details) => {
+  if (details.statusCode >= 400) {
+    console.error('Failed request:', details);
+  }
+});
 }
 
 process.on('SIGINT', () => {
