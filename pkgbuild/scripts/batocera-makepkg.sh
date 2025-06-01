@@ -178,7 +178,7 @@ function main() {
 			    i=$((i+1))
 		    done
 	    fi
-			chmod -R 0777 /userdata
+
 	    for a in $(get_config arch | sed "s:,: :g"); do
 		    make_pkg "$(get_config pkgname)-$(get_config pkgver)-$a"
 	    done
