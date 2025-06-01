@@ -1,9 +1,11 @@
-import { app, BrowserWindow } from 'electron';
+const { app, BrowserWindow, globalShortcut } = require('electron');
 
 app.commandLine.appendSwitch('lang', 'en-US');
 
+let win = null;
+
 function createWindow() {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     fullscreen: true,
     kiosk: true,
     show: false,
@@ -15,7 +17,9 @@ function createWindow() {
     }
   });
 
-  win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => console.error('Failed to load URL:', errorDescription, errorCode));
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load URL:', errorDescription, errorCode);
+  });
 
   win.loadURL('https://arcade.makecode.com/kiosk')
     .catch(err => console.error('Error loading URL:', err));
@@ -25,6 +29,7 @@ function createWindow() {
   });
 
   win.on('closed', () => {
+    win = null;
     app.quit();
   });
 }
@@ -56,6 +61,12 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
