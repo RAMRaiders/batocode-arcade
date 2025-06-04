@@ -120,9 +120,9 @@ function make_pkg() {
 	echo "Creating package $pk ..."
 	LST_BATOEXEC=( $(ls "$BATOEXEC"* 2>/dev/null) )
 	if ! [[ -z "${LST_BATOEXEC[@]}" ]]; then
-	    tar --owner=0 --group=0 --numeric-owner --mode=000 --no-acls --no-xattrs -cf - "$INFO" "$BATOEXEC"* * | zstd -c --rsyncable - -o "$pk"
+	    tar --owner=0 --group=0 --numeric-owner --no-acls --no-xattrs -cf - "$INFO" "$BATOEXEC"* * | zstd -c --rsyncable - -o "$pk"
 	else
-	    tar --owner=0 --group=0 --numeric-owner --mode=000 --no-acls --no-xattrs -cf - "$INFO" * | zstd -c --rsyncable - -o "$pk"
+	    tar --owner=0 --group=0 --numeric-owner --no-acls --no-xattrs -cf - "$INFO" * | zstd -c --rsyncable - -o "$pk"
 	fi
 	ret=$?
 	chmod go+r "$pk" 2>/dev/null
