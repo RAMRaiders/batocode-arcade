@@ -71,7 +71,7 @@ runs:
         url = https://github.com/RAMRaiders/batocode-arcade
         PKGINFO
 
-        chmod -R 0777 "$PKG_ROOT"
+        chmod -R 0755 "$PKG_ROOT"
 
         echo "version_with_rel=$VERSION_WITH_REL" >> $GITHUB_OUTPUT
         echo "pkg_arch=$PKG_ARCH" >> $GITHUB_OUTPUT
